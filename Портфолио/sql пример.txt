@@ -1,0 +1,33 @@
+/* Выгрузить клиентов с первым заказом
+Напишем оконную функцию, которая учтёт первый заказ клиентов, активировавших промокод test1 или test2*/
+with cte as(
+select 
+ o.id_client, 
+ MIN ( o.dat ) as firstbuywithpromo, --первая покупка
+ iif( c.create_date <= MIN ( o.dat ), 'not new', 'new' ) as new --проверка нового клиента
+from orders as o with (nolock)
+left join clients as c with(nolock)
+ON o.id_client = c.id
+where o.pay != 2 --только заказы с прошедшими оплатами
+AND o.status != 6 --только не отменённые заказы
+AND o.website = 1 --только выбранный бренд
+AND o.dat >= '2020-04-06' --только с даты применения первого промокода
+AND o.promocode IN --проверим наличие промокода
+(select distinct PromoCode from orders where Promo like '%test1%' or Promo like '%test2%')
+group by
+ o.id_client,
+ c.create_date
+)
+select 
+ o.dat,
+ c.firstbuywithpromo,
+ c.new,
+ o.id,
+ o.id_client,
+ o.origin,
+ o.sum
+from orders as o with (nolock)
+inner join cte as c
+ON o.id_client = c.id_client
+where o.dat >= c.firstbuywithpromo --возьмём только клиентов, сделавших хотя бы 1 заказ по выбранным промокодам
+order by o.id_client
